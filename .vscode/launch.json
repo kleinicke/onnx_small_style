@@ -1,0 +1,44 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {"name":"Python: Current File","type":"python","request":"launch","program":"${file}","console":"integratedTerminal"},
+
+
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+        },
+
+        {
+            "name": "Python: eval",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["eval","--content-image","images/content-images/amber.jpg","--model","model/epoch_2_Wed_Dec_30_03:34:46_2020_100000.0_10000000000.0.model","--output-image","results/onnx2.jpg","--cuda","0"]
+        },
+        {
+            "name": "Python: convert",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["eval","--content-image","images/content-images/amber.jpg","--model","model/epoch_0_Thu_Dec_31_03:55:55_2020_100000.0_10000000000.0.model","--output-image","results/firsteval.jpg","--cuda","0","--export_onnx","model/style42.onnx"]
+            
+        },
+        {
+            "name": "Python: onnx eval",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["eval","--content-image","images/content-images/amber.jpg","--model","model/style2.onnx","--output-image","results/onnx.jpg","--cuda","0"]
+        }]
+    
+}
