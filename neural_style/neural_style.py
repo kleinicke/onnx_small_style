@@ -381,3 +381,5 @@ if __name__ == "__main__":
 # export:
 # python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_2_Wed_Dec_30_03\:34\:46_2020_100000.0_10000000000.0.model --output-image results/firsteval.jpg --cuda 0 --export_onnx model/style32.onnx
 
+# scaled down:
+# python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_1_Fri_Jan__1_00\:51\:25_2021_100000.0_10000000000.0.model --output-image results/small_135.jpg --cuda 0 --export_onnx model/small_135.onnx --content-scale=8
