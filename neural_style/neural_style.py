@@ -62,12 +62,13 @@ def train(args):
 
     features_style = vgg(utils.normalize_batch(style))
     gram_style = [utils.gram_matrix(y) for y in features_style]
-
+    
     for e in range(args.epochs):
         transformer.train()
         agg_content_loss = 0.0
         agg_style_loss = 0.0
         count = 0
+        print(f"starts epoch {e} at {time.ctime()}")
         for batch_id, (x, _) in enumerate(train_loader):
             n_batch = len(x)
             count += n_batch
@@ -372,6 +373,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# clone: !git clone https://github.com/kleinicke/onnx_small_style.git 
+# download !wget http://images.cocodataset.org/zips/train2014.zip
+# and !unzip train2014.zip -d dataset
+# and run !python onnx_small_style/neural_style/neural_style.py train --dataset dataset --style-image onnx_small_style/images/style-images/Van_Gogh.jpg --save-model-dir model --epochs 1 --cuda 1
 
 # python neural_style/neural_style.py train --dataset dataset --style-image images/style-images/candy.jpg --save-model-dir model --epochs 2 --cuda 1
 # Wed Dec 30 02:02:53 2020        Epoch 1:        [2000/82783]    content: 705594.299188  style: 1012111.594688   total: 1717705.893875
