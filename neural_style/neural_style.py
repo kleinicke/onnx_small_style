@@ -47,7 +47,12 @@ def train(args):
     train_dataset = datasets.ImageFolder(args.dataset, transform)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size)
 
-    transformer = TransformerNet().to(device)
+    transformer = TransformerNet()
+    style_model = TransformerNet()
+    if args.model is not None:
+        state_dict = torch.load(args.model)
+        transformer.load_state_dict(state_dict)
+    transformer.to(device)
     optimizer = Adam(transformer.parameters(), args.lr)
     mse_loss = torch.nn.MSELoss()
     torch.autograd.set_detect_anomaly(True)
@@ -128,7 +133,8 @@ def train(args):
 
     # save model
     transformer.eval().cpu()
-    save_model_filename = (
+    save_model_filename = f"{args.name}_{args.epochs}_{str(time.ctime()).replace(' ', '_')}.model"
+    (
         "epoch_"
         + str(args.epochs)
         + "_"
@@ -250,6 +256,18 @@ def main():
         required=True,
         help="path to training dataset, the path should point to a folder "
         "containing another folder with all the training images",
+    )
+    train_arg_parser.add_argument(
+        "--name",
+        type=str,
+        default="gogh",
+        help="name of stye",
+    )
+    train_arg_parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="saved model to be used for stylizing the image. If file ends in .pth - PyTorch path is used, if in .onnx - Caffe2 path",
     )
     train_arg_parser.add_argument(
         "--style-image",
@@ -378,6 +396,7 @@ if __name__ == "__main__":
 # download !wget http://images.cocodataset.org/zips/train2014.zip
 # and !unzip train2014.zip -d dataset
 # and run !python onnx_small_style/neural_style/neural_style.py train --dataset dataset --style-image onnx_small_style/images/style-images/Van_Gogh.jpg --save-model-dir model --epochs 1 --cuda 1
+# continue !python onnx_small_style/neural_style/neural_style.py train --dataset dataset --model model/epoch_1_Wed_Feb_24_13_21_38_2021_100000.0_10000000000.0.model --style-image onnx_small_style/images/style-images/Van_Gogh.jpg --save-model-dir model --epochs 1 --cuda 1
 
 # python neural_style/neural_style.py train --dataset dataset --style-image images/style-images/candy.jpg --save-model-dir model --epochs 2 --cuda 1
 # Wed Dec 30 02:02:53 2020        Epoch 1:        [2000/82783]    content: 705594.299188  style: 1012111.594688   total: 1717705.893875
