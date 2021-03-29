@@ -49,7 +49,6 @@ def train(args):
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size)
 
     transformer = TransformerNet()
-    style_model = TransformerNet()
     if args.model is not None:
         state_dict = torch.load(args.model)
         transformer.load_state_dict(state_dict)
@@ -128,7 +127,6 @@ def train(args):
                 torch.save(transformer.state_dict(), ckpt_model_path)
                 transformer.to(device).train()
 
-    if (batch_id + 1) % args.log_interval == 0:
         mesg = "{}\tEpoch {}:\t[{}/{}]\tcontent: {:.6f}\tstyle: {:.6f}\ttotal: {:.6f}".format(
             time.ctime(),
             e + 1,
@@ -139,24 +137,25 @@ def train(args):
             (agg_content_loss + agg_style_loss) / (batch_id + 1),
         )
         print(mesg)
-    # save model
-    transformer.eval().cpu()
-    save_model_filename = f"{args.name}_{args.epochs}_{str(time.ctime()).replace(' ', '_')}.model"
-    (
-        "epoch_"
-        + str(args.epochs)
-        + "_"
-        + str(time.ctime()).replace(" ", "_")
-        + "_"
-        + str(args.content_weight)
-        + "_"
-        + str(args.style_weight)
-        + ".model"
-    )
-    save_model_path = os.path.join(args.save_model_dir, save_model_filename)
-    torch.save(transformer.state_dict(), save_model_path)
+        # save model
+        transformer.eval().cpu()
+        save_model_filename = f"{args.name}_{args.epochs}_{str(time.ctime()).replace(' ', '_')}.model"
+        (
+            "epoch_"
+            + str(args.epochs)
+            + "_"
+            + str(time.ctime()).replace(" ", "_")
+            + "_"
+            + str(args.content_weight)
+            + "_"
+            + str(args.style_weight)
+            + ".model"
+        )
+        save_model_path = os.path.join(args.save_model_dir, save_model_filename)
+        torch.save(transformer.state_dict(), save_model_path)
 
-    print("\nDone, trained model saved at", save_model_path)
+        print("\nDone, trained model saved at", save_model_path)
+        transformer.to(device).train()
 
 
 def stylize(args):
@@ -188,32 +187,13 @@ def stylize(args):
                     style_model, content_image, args.export_onnx, opset_version=7,
                 ).cpu()
                 print(content_image.shape[1:])
-                k_model = pytorch_to_keras(
-                    style_model, content_image, [(3, None, None)], verbose=True, name_policy="short"
-                )
-                assert 0
+                # k_model = pytorch_to_keras(
+                #     style_model, content_image, [(3, None, None)], verbose=True, name_policy="short"
+                # )
+                # assert 0
             else:
                 output = style_model(content_image).cpu()
     utils.save_image(args.output_image, output[0])
-
-
-def stylize_onnx_caffe2(content_image, args):
-    """
-    Read ONNX model and run it using Caffe2
-    """
-
-    assert not args.export_onnx
-
-    import onnx
-    import onnx_caffe2.backend
-
-    model = onnx.load(args.model)
-
-    prepared_backend = onnx_caffe2.backend.prepare(model, device="CUDA" if args.cuda else "CPU")
-    inp = {model.graph.input[0].name: content_image.numpy()}
-    c2_out = prepared_backend.run(inp)[0]
-
-    return torch.from_numpy(c2_out)
 
 
 def stylize_onnx(content_image, args):
