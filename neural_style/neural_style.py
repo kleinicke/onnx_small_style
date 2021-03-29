@@ -15,6 +15,7 @@ import torch.onnx
 import utils
 from new_transformer import TransformerNet
 from vgg import Vgg16
+from pytorch2keras.converter import pytorch_to_keras
 
 
 def check_paths(args):
@@ -67,7 +68,7 @@ def train(args):
 
     features_style = vgg(utils.normalize_batch(style))
     gram_style = [utils.gram_matrix(y) for y in features_style]
-    
+
     for e in range(args.epochs):
         transformer.train()
         agg_content_loss = 0.0
@@ -88,9 +89,7 @@ def train(args):
             features_y = vgg(y)
             features_x = vgg(x)
 
-            content_loss = args.content_weight * mse_loss(
-                features_y.relu2_2, features_x.relu2_2
-            )
+            content_loss = args.content_weight * mse_loss(features_y.relu2_2, features_x.relu2_2)
 
             style_loss = 0.0
             for ft_y, gm_s in zip(features_y, gram_style):
@@ -125,12 +124,21 @@ def train(args):
                 ckpt_model_filename = (
                     "ckpt_epoch_" + str(e) + "_batch_id_" + str(batch_id + 1) + ".pth"
                 )
-                ckpt_model_path = os.path.join(
-                    args.checkpoint_model_dir, ckpt_model_filename
-                )
+                ckpt_model_path = os.path.join(args.checkpoint_model_dir, ckpt_model_filename)
                 torch.save(transformer.state_dict(), ckpt_model_path)
                 transformer.to(device).train()
 
+    if (batch_id + 1) % args.log_interval == 0:
+        mesg = "{}\tEpoch {}:\t[{}/{}]\tcontent: {:.6f}\tstyle: {:.6f}\ttotal: {:.6f}".format(
+            time.ctime(),
+            e + 1,
+            count,
+            len(train_dataset),
+            agg_content_loss / (batch_id + 1),
+            agg_style_loss / (batch_id + 1),
+            (agg_content_loss + agg_style_loss) / (batch_id + 1),
+        )
+        print(mesg)
     # save model
     transformer.eval().cpu()
     save_model_filename = f"{args.name}_{args.epochs}_{str(time.ctime()).replace(' ', '_')}.model"
@@ -175,12 +183,15 @@ def stylize(args):
             style_model.to(device)
             style_model.eval()
             if args.export_onnx:
-                assert args.export_onnx.endswith(
-                    ".onnx"
-                ), "Export model file should end with .onnx"
+                assert args.export_onnx.endswith(".onnx"), "Export model file should end with .onnx"
                 output = torch.onnx._export(
                     style_model, content_image, args.export_onnx, opset_version=7,
                 ).cpu()
+                print(content_image.shape[1:])
+                k_model = pytorch_to_keras(
+                    style_model, content_image, [(3, None, None)], verbose=True, name_policy="short"
+                )
+                assert 0
             else:
                 output = style_model(content_image).cpu()
     utils.save_image(args.output_image, output[0])
@@ -198,9 +209,7 @@ def stylize_onnx_caffe2(content_image, args):
 
     model = onnx.load(args.model)
 
-    prepared_backend = onnx_caffe2.backend.prepare(
-        model, device="CUDA" if args.cuda else "CPU"
-    )
+    prepared_backend = onnx_caffe2.backend.prepare(model, device="CUDA" if args.cuda else "CPU")
     inp = {model.graph.input[0].name: content_image.numpy()}
     c2_out = prepared_backend.run(inp)[0]
 
@@ -219,11 +228,7 @@ def stylize_onnx(content_image, args):
     ort_session = onnxruntime.InferenceSession(args.model)
 
     def to_numpy(tensor):
-        return (
-            tensor.detach().cpu().numpy()
-            if tensor.requires_grad
-            else tensor.cpu().numpy()
-        )
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
     ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(content_image)}
     ort_outs = ort_session.run(None, ort_inputs)
@@ -233,22 +238,15 @@ def stylize_onnx(content_image, args):
 
 
 def main():
-    main_arg_parser = argparse.ArgumentParser(
-        description="parser for fast-neural-style"
-    )
+    main_arg_parser = argparse.ArgumentParser(description="parser for fast-neural-style")
     subparsers = main_arg_parser.add_subparsers(title="subcommands", dest="subcommand")
 
-    train_arg_parser = subparsers.add_parser(
-        "train", help="parser for training arguments"
-    )
+    train_arg_parser = subparsers.add_parser("train", help="parser for training arguments")
     train_arg_parser.add_argument(
         "--epochs", type=int, default=2, help="number of training epochs, default is 2"
     )
     train_arg_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=4,
-        help="batch size for training, default is 4",
+        "--batch-size", type=int, default=4, help="batch size for training, default is 4",
     )
     train_arg_parser.add_argument(
         "--dataset",
@@ -258,10 +256,7 @@ def main():
         "containing another folder with all the training images",
     )
     train_arg_parser.add_argument(
-        "--name",
-        type=str,
-        default="gogh",
-        help="name of stye",
+        "--name", type=str, default="gogh", help="name of stye",
     )
     train_arg_parser.add_argument(
         "--model",
@@ -288,10 +283,7 @@ def main():
         help="path to folder where checkpoints of trained models will be saved",
     )
     train_arg_parser.add_argument(
-        "--image-size",
-        type=int,
-        default=256,
-        help="size of training images, default is 256 X 256",
+        "--image-size", type=int, default=256, help="size of training images, default is 256 X 256",
     )
     train_arg_parser.add_argument(
         "--style-size",
@@ -300,25 +292,14 @@ def main():
         help="size of style-image, default is the original size of style image",
     )
     train_arg_parser.add_argument(
-        "--cuda",
-        type=int,
-        required=True,
-        help="set it to 1 for running on GPU, 0 for CPU",
+        "--cuda", type=int, required=True, help="set it to 1 for running on GPU, 0 for CPU",
+    )
+    train_arg_parser.add_argument("--seed", type=int, default=42, help="random seed for training")
+    train_arg_parser.add_argument(
+        "--content-weight", type=float, default=1e5, help="weight for content-loss, default is 1e5",
     )
     train_arg_parser.add_argument(
-        "--seed", type=int, default=42, help="random seed for training"
-    )
-    train_arg_parser.add_argument(
-        "--content-weight",
-        type=float,
-        default=1e5,
-        help="weight for content-loss, default is 1e5",
-    )
-    train_arg_parser.add_argument(
-        "--style-weight",
-        type=float,
-        default=1e10,
-        help="weight for style-loss, default is 1e10",
+        "--style-weight", type=float, default=1e10, help="weight for style-loss, default is 1e10",
     )
     train_arg_parser.add_argument(
         "--lr", type=float, default=1e-3, help="learning rate, default is 1e-3"
@@ -352,10 +333,7 @@ def main():
         help="factor for scaling down the content image",
     )
     eval_arg_parser.add_argument(
-        "--output-image",
-        type=str,
-        required=True,
-        help="path for saving the output image",
+        "--output-image", type=str, required=True, help="path for saving the output image",
     )
     eval_arg_parser.add_argument(
         "--model",
@@ -364,10 +342,7 @@ def main():
         help="saved model to be used for stylizing the image. If file ends in .pth - PyTorch path is used, if in .onnx - Caffe2 path",
     )
     eval_arg_parser.add_argument(
-        "--cuda",
-        type=int,
-        required=True,
-        help="set it to 1 for running on GPU, 0 for CPU",
+        "--cuda", type=int, required=True, help="set it to 1 for running on GPU, 0 for CPU",
     )
     eval_arg_parser.add_argument(
         "--export_onnx", type=str, help="export ONNX model to a given file"
@@ -392,7 +367,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-# clone: !git clone https://github.com/kleinicke/onnx_small_style.git 
+# clone: !git clone https://github.com/kleinicke/onnx_small_style.git
 # download !wget http://images.cocodataset.org/zips/train2014.zip
 # and !unzip train2014.zip -d dataset
 # and run !python onnx_small_style/neural_style/neural_style.py train --dataset dataset --style-image onnx_small_style/images/style-images/Van_Gogh.jpg --save-model-dir model --epochs 1 --cuda 1
@@ -408,3 +383,10 @@ if __name__ == "__main__":
 
 # scaled down:
 # python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_1_Fri_Jan__1_00\:51\:25_2021_100000.0_10000000000.0.model --output-image results/small_135.jpg --cuda 0 --export_onnx model/small_135.onnx --content-scale=8
+
+
+# transforming to tfjs:
+# pip install onnx
+# pip install onnx-tf
+# pip install git+https://github.com/onnx/onnx-tensorflow.git
+
