@@ -15,7 +15,6 @@ import torch.onnx
 import utils
 from new_transformer import TransformerNet
 from vgg import Vgg16
-from pytorch2keras.converter import pytorch_to_keras
 
 
 def check_paths(args):
@@ -153,6 +152,9 @@ def train(args):
         )
         save_model_path = os.path.join(args.save_model_dir, save_model_filename)
         torch.save(transformer.state_dict(), save_model_path)
+        if args.save_model_name:
+            save_model_path = os.path.join(args.save_model_dir, args.save_model_name)
+        torch.save(transformer.state_dict(), save_model_path)
 
         print("\nDone, trained model saved at", save_model_path)
         transformer.to(device).train()
@@ -255,6 +257,12 @@ def main():
         type=str,
         required=True,
         help="path to folder where trained model will be saved.",
+    )
+    train_arg_parser.add_argument(
+        "--save-model-name",
+        type=str,
+        default=False,
+        help="resulting model name.",
     )
     train_arg_parser.add_argument(
         "--checkpoint-model-dir",
