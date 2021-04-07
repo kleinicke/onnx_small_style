@@ -195,6 +195,19 @@ def stylize(args):
                 # assert 0
             else:
                 output = style_model(content_image).cpu()
+            if args.export_coreml:
+                assert args.export_coreml.endswith(".mlmodel"), "Export model file should end with .mlmodel"
+                import coremltools as ct
+                traced_model = torch.jit.trace(style_model, content_image)
+                model = ct.convert(
+                    traced_model,
+                    # inputs=[ct.ImageType(name="content_image", shape=content_image.shape)]
+                )
+                model.save(args.export_coreml)
+                output = model.predict({"input_1": content_image})
+
+
+
     utils.save_image(args.output_image, output[0])
 
 
@@ -335,7 +348,9 @@ def main():
     eval_arg_parser.add_argument(
         "--export_onnx", type=str, help="export ONNX model to a given file"
     )
-
+    eval_arg_parser.add_argument(
+        "--export_coreml", type=str, help="export coreml (.mlmodel) model to a given file"
+    )
     args = main_arg_parser.parse_args()
 
     if args.subcommand is None:
@@ -366,8 +381,11 @@ if __name__ == "__main__":
 # Wed Dec 30 02:26:20 2020        Epoch 1:        [44000/82783]   content: 409612.164514  style: 208947.228191    total: 618559.392705
 # Wed Dec 30 03:34:20 2020        Epoch 2:        [82000/82783]   content: 317375.780068  style: 134775.075734    total: 452150.855802
 # python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_2_Wed_Dec_30_03\:34\:46_2020_100000.0_10000000000.0.model --output-image results/first.jpg --cuda 0
-# export:
+# export onnx:
 # python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_2_Wed_Dec_30_03\:34\:46_2020_100000.0_10000000000.0.model --output-image results/firsteval.jpg --cuda 0 --export_onnx model/style32.onnx
+# export coreml:
+# python neural_style/neural_style.py eval --content-image images/content-images/birds350.jpeg  --model model/gogh_starry.model --output-image results/gogh_350.jpg --cuda 0 --export_coreml model/gogh350.mlmodel
+
 
 # scaled down:
 # python neural_style/neural_style.py eval --content-image images/content-images/amber.jpg  --model model/epoch_1_Fri_Jan__1_00\:51\:25_2021_100000.0_10000000000.0.model --output-image results/small_135.jpg --cuda 0 --export_onnx model/small_135.onnx --content-scale=8
